@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RSS Clip — 情報収集ツール</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #222222;
+    --border: #2e2e2e;
+    --accent: #c8f060;
+    --accent2: #60c8f0;
+    --text: #e8e8e8;
+    --text-muted: #888;
+    --text-dim: #555;
+    --danger: #f06060;
+    --saved: #f0a060;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* HEADER */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'DM Mono', monospace;
+    font-size: 16px;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+
+  .logo span { color: var(--text-muted); }
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  /* LAYOUT */
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr 320px;
+    height: calc(100vh - 56px);
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .feed-add {
+    display: flex;
+    gap: 6px;
+  }
+
+  .feed-add input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--text);
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .feed-add input:focus { border-color: var(--accent); }
+  .feed-add input::placeholder { color: var(--text-dim); }
+
+  .btn {
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: 'Noto Sans JP', sans-serif;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-accent {
+    background: var(--accent);
+    color: #0f0f0f;
+    font-weight: 700;
+  }
+  .btn-accent:hover { background: #d8ff70; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid transparent;
+    padding: 2px 6px;
+    font-size: 11px;
+  }
+  .btn-danger:hover { border-color: var(--danger); }
+
+  .feed-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+
+  .feed-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+    gap: 8px;
+  }
+
+  .feed-item:hover { background: var(--surface); }
+  .feed-item.active { background: var(--surface2); border-left: 2px solid var(--accent); }
+
+  .feed-item-info { flex: 1; min-width: 0; }
+  .feed-name {
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .feed-url {
+    font-size: 10px;
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .feed-count {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    background: rgba(200,240,96,0.1);
+    padding: 2px 6px;
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  /* MAIN ARTICLES */
+  .main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .main-toolbar {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .main-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
+  .main-title strong { color: var(--text); }
+
+  .toolbar-right { display: flex; gap: 8px; align-items: center; }
+
+  .filter-tabs {
+    display: flex;
+    gap: 4px;
+  }
+
+  .filter-tab {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    transition: all 0.15s;
+    font-family: 'Noto Sans JP', sans-serif;
+  }
+
+  .filter-tab.active {
+    background: var(--accent);
+    color: #0f0f0f;
+    border-color: var(--accent);
+    font-weight: 700;
+  }
+
+  .articles {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .article-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    transition: all 0.2s;
+    cursor: default;
+    position: relative;
+  }
+
+  .article-card:hover { border-color: #3e3e3e; background: var(--surface2); }
+  .article-card.is-saved { border-color: rgba(240,160,96,0.3); }
+
+  .article-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .article-source {
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    color: var(--accent2);
+    background: rgba(96,200,240,0.08);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .article-date {
+    font-size: 10px;
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .article-title {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+
+  .article-title a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .article-title a:hover { color: var(--accent); }
+
+  .article-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .article-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+  }
+
+  .btn-save {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: 'Noto Sans JP', sans-serif;
+    transition: all 0.15s;
+  }
+
+  .btn-save:hover { border-color: var(--saved); color: var(--saved); }
+
+  .btn-save.saved {
+    background: rgba(240,160,96,0.1);
+    border-color: var(--saved);
+    color: var(--saved);
+  }
+
+  .btn-open {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: 'Noto Sans JP', sans-serif;
+    text-decoration: none;
+    transition: all 0.15s;
+  }
+  .btn-open:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* SAVED PANEL */
+  .saved-panel {
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .saved-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .saved-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+  }
+
+  .saved-count {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--saved);
+  }
+
+  .saved-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .saved-item {
+    background: var(--surface);
+    border: 1px solid rgba(240,160,96,0.2);
+    border-radius: 8px;
+    padding: 12px;
+    transition: all 0.15s;
+  }
+
+  .saved-item:hover { border-color: rgba(240,160,96,0.4); }
+
+  .saved-item-source {
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    color: var(--accent2);
+    margin-bottom: 4px;
+  }
+
+  .saved-item-title {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.4;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+
+  .saved-item-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .saved-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .memo-area {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--text);
+    font-size: 12px;
+    font-family: 'Noto Sans JP', sans-serif;
+    resize: none;
+    outline: none;
+    line-height: 1.6;
+    transition: border-color 0.2s;
+  }
+  .memo-area:focus { border-color: var(--accent); }
+  .memo-area::placeholder { color: var(--text-dim); }
+
+  .download-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #0f0f0f;
+    border: none;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Noto Sans JP', sans-serif;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .download-btn:hover { background: #d8ff70; }
+  .download-btn:disabled { background: var(--border); color: var(--text-dim); cursor: default; }
+
+  /* LOADING / EMPTY */
+  .state-msg {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-dim);
+  }
+  .state-msg .icon { font-size: 32px; margin-bottom: 12px; }
+  .state-msg p { font-size: 13px; line-height: 1.8; }
+
+  /* LOADING SPINNER */
+  .spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 12px;
+    color: var(--text);
+    z-index: 1000;
+    animation: toastIn 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .toast.success { border-color: var(--accent); }
+  .toast.error { border-color: var(--danger); }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .tag-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'DM Mono', monospace;
+  }
+  .tag-総務 { background: rgba(96,200,240,0.12); color: var(--accent2); }
+  .tag-経理 { background: rgba(200,240,96,0.12); color: var(--accent); }
+  .tag-人事 { background: rgba(240,160,96,0.12); color: var(--saved); }
+  .tag-その他 { background: rgba(136,136,136,0.12); color: var(--text-muted); }
+
+  .feed-tag-select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    color: var(--text);
+    font-size: 12px;
+    font-family: 'Noto Sans JP', sans-serif;
+    outline: none;
+    width: 100%;
+    margin-top: 6px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">RSS<span>/</span>CLIP</div>
+  <div class="header-actions">
+    <span style="font-size:11px;color:var(--text-dim);font-family:'DM Mono',monospace;" id="last-updated"></span>
+    <button class="btn btn-ghost" onclick="refreshAll()">↻ 更新</button>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- SIDEBAR: FEEDS -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">フィード登録</div>
+      <div class="feed-add">
+        <input type="text" id="feed-url-input" placeholder="RSS URL を貼り付け" />
+        <button class="btn btn-accent" onclick="addFeed()">追加</button>
+      </div>
+      <select class="feed-tag-select" id="feed-tag-select">
+        <option value="総務">総務</option>
+        <option value="経理">経理</option>
+        <option value="人事">人事</option>
+        <option value="その他">その他</option>
+      </select>
+    </div>
+
+    <div style="padding:8px 16px 4px;display:flex;align-items:center;justify-content:space-between;">
+      <div class="sidebar-label" style="margin:0">登録フィード</div>
+      <button class="btn btn-ghost" style="padding:2px 8px;font-size:10px;" onclick="loadAll()">全て表示</button>
+    </div>
+
+    <div class="feed-list" id="feed-list">
+      <div class="state-msg" style="padding:20px">
+        <p style="font-size:11px;">RSSのURLを追加してください</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN: ARTICLES -->
+  <main class="main">
+    <div class="main-toolbar">
+      <div class="main-title" id="main-title">フィードを選択してください</div>
+      <div class="toolbar-right">
+        <div class="filter-tabs">
+          <button class="filter-tab active" onclick="setFilter('all', this)">すべて</button>
+          <button class="filter-tab" onclick="setFilter('saved', this)">保存済み</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="articles" id="articles">
+      <div class="state-msg">
+        <div class="icon">📡</div>
+        <p>左のサイドバーからフィードを追加して<br>記事を取得してください</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- RIGHT: SAVED PANEL -->
+  <aside class="saved-panel">
+    <div class="saved-header">
+      <div class="saved-title">CLIPPED</div>
+      <div class="saved-count" id="saved-count">0 件</div>
+    </div>
+
+    <div class="saved-list" id="saved-list">
+      <div class="state-msg" style="padding:20px">
+        <p style="font-size:11px;">気になった記事を<br>保存するとここに表示されます</p>
+      </div>
+    </div>
+
+    <div class="saved-footer">
+      <textarea class="memo-area" id="global-memo" rows="4" placeholder="メモ・コメントを入力（.mdに含まれます）"></textarea>
+      <button class="download-btn" id="download-btn" onclick="downloadMd()" disabled>
+        ↓ Obsidian用 .md をダウンロード
+      </button>
+    </div>
+  </aside>
+</div>
+
+<script>
+// =========================================================
+// STATE
+// =========================================================
+let feeds = JSON.parse(localStorage.getItem('rss-feeds') || '[]');
+let savedArticles = JSON.parse(localStorage.getItem('rss-saved') || '[]');
+let allArticles = [];
+let currentFeedId = null;
+let currentFilter = 'all';
+
+const PROXY = 'https://api.rss2json.com/v1/api.json?rss_url=';
+
+// Default feeds
+if (feeds.length === 0) {
+  feeds = [
+    { id: uid(), name: '厚生労働省 新着情報', url: 'https://www.mhlw.go.jp/rss/new.rdf', tag: '人事' },
+    { id: uid(), name: 'freee 公式ブログ', url: 'https://corp.freee.co.jp/feed', tag: '経理' },
+    { id: uid(), name: 'マネーフォワード', url: 'https://media.moneyforward.com/feed', tag: '経理' },
+  ];
+  saveFeeds();
+}
+
+function uid() {
+  return Math.random().toString(36).slice(2, 9);
+}
+
+function saveFeeds() {
+  localStorage.setItem('rss-feeds', JSON.stringify(feeds));
+}
+
+function saveSaved() {
+  localStorage.setItem('rss-saved', JSON.stringify(savedArticles));
+}
+
+// =========================================================
+// FEED MANAGEMENT
+// =========================================================
+async function addFeed() {
+  const input = document.getElementById('feed-url-input');
+  const tagSelect = document.getElementById('feed-tag-select');
+  const url = input.value.trim();
+  if (!url) return;
+
+  showToast('フィードを取得中...', 'info');
+
+  try {
+    const res = await fetch(PROXY + encodeURIComponent(url));
+    const data = await res.json();
+    if (data.status !== 'ok') throw new Error('取得失敗');
+
+    const feed = {
+      id: uid(),
+      name: data.feed.title || url,
+      url: url,
+      tag: tagSelect.value
+    };
+    feeds.push(feed);
+    saveFeeds();
+    renderFeedList();
+    input.value = '';
+    showToast('✓ フィードを追加しました', 'success');
+    loadFeed(feed.id);
+  } catch (e) {
+    showToast('取得できませんでした。URLを確認してください', 'error');
+  }
+}
+
+function removeFeed(id) {
+  feeds = feeds.filter(f => f.id !== id);
+  saveFeeds();
+  renderFeedList();
+  if (currentFeedId === id) {
+    currentFeedId = null;
+    allArticles = [];
+    renderArticles();
+    document.getElementById('main-title').textContent = 'フィードを選択してください';
+  }
+}
+
+function renderFeedList() {
+  const el = document.getElementById('feed-list');
+  if (feeds.length === 0) {
+    el.innerHTML = '<div class="state-msg" style="padding:20px"><p style="font-size:11px;">RSSのURLを追加してください</p></div>';
+    return;
+  }
+
+  el.innerHTML = feeds.map(f => {
+    const count = savedArticles.filter(a => a.feedId === f.id).length;
+    return `
+      <div class="feed-item ${currentFeedId === f.id ? 'active' : ''}" onclick="loadFeed('${f.id}')">
+        <div class="feed-item-info">
+          <div class="feed-name">${escHtml(f.name)}</div>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
+            <span class="tag-badge tag-${f.tag}">${f.tag}</span>
+          </div>
+        </div>
+        ${count > 0 ? `<div class="feed-count">${count}</div>` : ''}
+        <button class="btn btn-danger" onclick="event.stopPropagation();removeFeed('${f.id}')" title="削除">✕</button>
+      </div>
+    `;
+  }).join('');
+}
+
+// =========================================================
+// LOAD ARTICLES
+// =========================================================
+async function loadFeed(feedId) {
+  currentFeedId = feedId;
+  const feed = feeds.find(f => f.id === feedId);
+  if (!feed) return;
+
+  renderFeedList();
+
+  const articlesEl = document.getElementById('articles');
+  document.getElementById('main-title').innerHTML = `<strong>${escHtml(feed.name)}</strong> の記事`;
+  articlesEl.innerHTML = '<div class="state-msg"><div class="spinner"></div><p>記事を取得中...</p></div>';
+
+  try {
+    const res = await fetch(PROXY + encodeURIComponent(feed.url) + '&count=30');
+    const data = await res.json();
+    if (data.status !== 'ok') throw new Error();
+
+    allArticles = data.items.map(item => ({
+      id: uid(),
+      feedId: feed.id,
+      feedName: feed.name,
+      feedTag: feed.tag,
+      title: item.title,
+      link: item.link,
+      description: stripHtml(item.description || item.content || ''),
+      pubDate: item.pubDate,
+    }));
+
+    document.getElementById('last-updated').textContent = '更新: ' + new Date().toLocaleTimeString('ja-JP');
+    renderArticles();
+  } catch(e) {
+    articlesEl.innerHTML = '<div class="state-msg"><div class="icon">⚠️</div><p>記事を取得できませんでした<br>CORSの制限の可能性があります</p></div>';
+  }
+}
+
+async function loadAll() {
+  currentFeedId = 'all';
+  renderFeedList();
+  allArticles = [];
+
+  const articlesEl = document.getElementById('articles');
+  document.getElementById('main-title').innerHTML = '<strong>すべてのフィード</strong>';
+  articlesEl.innerHTML = '<div class="state-msg"><div class="spinner"></div><p>全フィードを取得中...</p></div>';
+
+  for (const feed of feeds) {
+    try {
+      const res = await fetch(PROXY + encodeURIComponent(feed.url) + '&count=10');
+      const data = await res.json();
+      if (data.status !== 'ok') continue;
+      const items = data.items.map(item => ({
+        id: uid(),
+        feedId: feed.id,
+        feedName: feed.name,
+        feedTag: feed.tag,
+        title: item.title,
+        link: item.link,
+        description: stripHtml(item.description || item.content || ''),
+        pubDate: item.pubDate,
+      }));
+      allArticles = allArticles.concat(items);
+    } catch(e) {}
+  }
+
+  allArticles.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+  document.getElementById('last-updated').textContent = '更新: ' + new Date().toLocaleTimeString('ja-JP');
+  renderArticles();
+}
+
+async function refreshAll() {
+  if (currentFeedId === 'all') loadAll();
+  else if (currentFeedId) loadFeed(currentFeedId);
+}
+
+// =========================================================
+// RENDER ARTICLES
+// =========================================================
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderArticles();
+}
+
+function renderArticles() {
+  const el = document.getElementById('articles');
+
+  let articles = allArticles;
+  if (currentFilter === 'saved') {
+    const savedIds = savedArticles.map(a => a.link);
+    articles = articles.filter(a => savedIds.includes(a.link));
+  }
+
+  if (articles.length === 0) {
+    el.innerHTML = '<div class="state-msg"><div class="icon">📭</div><p>記事がありません</p></div>';
+    return;
+  }
+
+  el.innerHTML = articles.map(a => {
+    const isSaved = savedArticles.some(s => s.link === a.link);
+    const date = a.pubDate ? new Date(a.pubDate).toLocaleDateString('ja-JP') : '';
+    return `
+      <div class="article-card ${isSaved ? 'is-saved' : ''}" id="card-${a.id}">
+        <div class="article-top">
+          <div class="article-meta">
+            <span class="article-source">${escHtml(a.feedName)}</span>
+            <span class="tag-badge tag-${a.feedTag}">${a.feedTag}</span>
+            ${date ? `<span class="article-date">${date}</span>` : ''}
+          </div>
+        </div>
+        <div class="article-title">
+          <a href="${escHtml(a.link)}" target="_blank" rel="noopener">${escHtml(a.title)}</a>
+        </div>
+        ${a.description ? `<div class="article-desc">${escHtml(a.description)}</div>` : ''}
+        <div class="article-actions">
+          <button class="btn-save ${isSaved ? 'saved' : ''}" onclick="toggleSave(${JSON.stringify(a).replace(/"/g, '&quot;')})">
+            ${isSaved ? '✓ 保存済み' : '＋ 保存'}
+          </button>
+          <a class="btn-open" href="${escHtml(a.link)}" target="_blank" rel="noopener">記事を開く →</a>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// =========================================================
+// SAVE / UNSAVE
+// =========================================================
+function toggleSave(article) {
+  const idx = savedArticles.findIndex(a => a.link === article.link);
+  if (idx >= 0) {
+    savedArticles.splice(idx, 1);
+    showToast('保存を解除しました', 'info');
+  } else {
+    savedArticles.push({ ...article, savedAt: new Date().toISOString() });
+    showToast('✓ 保存しました', 'success');
+  }
+  saveSaved();
+  renderArticles();
+  renderSaved();
+  renderFeedList();
+}
+
+function removeSaved(link) {
+  savedArticles = savedArticles.filter(a => a.link !== link);
+  saveSaved();
+  renderArticles();
+  renderSaved();
+  renderFeedList();
+}
+
+function renderSaved() {
+  const el = document.getElementById('saved-list');
+  const countEl = document.getElementById('saved-count');
+  const dlBtn = document.getElementById('download-btn');
+
+  countEl.textContent = savedArticles.length + ' 件';
+  dlBtn.disabled = savedArticles.length === 0;
+
+  if (savedArticles.length === 0) {
+    el.innerHTML = '<div class="state-msg" style="padding:20px"><p style="font-size:11px;">気になった記事を<br>保存するとここに表示されます</p></div>';
+    return;
+  }
+
+  el.innerHTML = savedArticles.map((a, i) => `
+    <div class="saved-item">
+      <div class="saved-item-source">
+        <span class="tag-badge tag-${a.feedTag}">${a.feedTag}</span>
+        ${escHtml(a.feedName)}
+      </div>
+      <div class="saved-item-title">${escHtml(a.title)}</div>
+      <div class="saved-item-actions">
+        <a class="btn-open" href="${escHtml(a.link)}" target="_blank" rel="noopener" style="font-size:10px;padding:3px 8px;">開く</a>
+        <button class="btn btn-danger" onclick="removeSaved('${escHtml(a.link)}')">削除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// =========================================================
+// DOWNLOAD .MD
+// =========================================================
+function downloadMd() {
+  const memo = document.getElementById('global-memo').value;
+  const today = new Date().toISOString().split('T')[0];
+
+  let md = `# RSS クリップ — ${today}\n\n`;
+  md += `作成日: ${today}\n\n`;
+
+  if (memo) {
+    md += `## メモ・コメント\n\n${memo}\n\n`;
+  }
+
+  const tags = [...new Set(savedArticles.map(a => a.feedTag))];
+
+  tags.forEach(tag => {
+    const articles = savedArticles.filter(a => a.feedTag === tag);
+    md += `## ${tag}\n\n`;
+    articles.forEach(a => {
+      const date = a.pubDate ? new Date(a.pubDate).toLocaleDateString('ja-JP') : '';
+      md += `### ${a.title}\n\n`;
+      md += `- **ソース**: ${a.feedName}\n`;
+      if (date) md += `- **日付**: ${date}\n`;
+      md += `- **URL**: ${a.link}\n`;
+      if (a.description) md += `\n${a.description.slice(0, 300)}${a.description.length > 300 ? '...' : ''}\n`;
+      md += `\n---\n\n`;
+    });
+  });
+
+  md += `\n> 作成: RSS CLIP\n`;
+
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `rss-clip-${today}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✓ .md ファイルをダウンロードしました', 'success');
+}
+
+// =========================================================
+// UTILS
+// =========================================================
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function stripHtml(html) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || '';
+}
+
+let toastTimer;
+function showToast(msg, type = 'info') {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  clearTimeout(toastTimer);
+
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+
+  toastTimer = setTimeout(() => toast.remove(), 2500);
+}
+
+// =========================================================
+// INIT
+// =========================================================
+renderFeedList();
+renderSaved();
+</script>
+</body>
+</html>
