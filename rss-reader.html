@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RSS CLIP</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg: #0f0f0f;
+  --surface: #1a1a1a;
+  --surface2: #222;
+  --border: #2e2e2e;
+  --accent: #c8f060;
+  --accent2: #60c8f0;
+  --text: #e8e8e8;
+  --muted: #888;
+  --dim: #555;
+  --danger: #f06060;
+  --saved: #f0a060;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+  overflow-x: hidden;
+}
+
+header {
+  height: 52px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 100;
+}
+.logo { font-family: 'DM Mono', monospace; font-size: 15px; color: var(--accent); }
+.logo span { color: var(--muted); }
+.header-right { display: flex; align-items: center; gap: 8px; }
+.updated { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--dim); }
+
+.btn {
+  border: none; border-radius: 6px; padding: 6px 12px;
+  font-size: 12px; cursor: pointer;
+  font-family: 'Noto Sans JP', sans-serif;
+  transition: all 0.15s; white-space: nowrap;
+}
+.btn-accent { background: var(--accent); color: #0f0f0f; font-weight: 700; }
+.btn-accent:hover { background: #d8ff70; }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-danger { background: transparent; color: var(--danger); border: 1px solid transparent; padding: 2px 6px; font-size: 11px; cursor: pointer; font-family: 'Noto Sans JP', sans-serif; }
+.btn-danger:hover { border-color: var(--danger); }
+
+.tag-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-family: 'DM Mono', monospace; }
+.tag-総務 { background: rgba(96,200,240,0.12); color: var(--accent2); }
+.tag-経理 { background: rgba(200,240,96,0.12); color: var(--accent); }
+.tag-人事 { background: rgba(240,160,96,0.12); color: var(--saved); }
+.tag-その他 { background: rgba(136,136,136,0.12); color: var(--muted); }
+
+.state-msg { text-align: center; padding: 40px 20px; color: var(--dim); }
+.state-msg .icon { font-size: 28px; margin-bottom: 10px; }
+.state-msg p { font-size: 12px; line-height: 1.8; }
+.spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.article-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; transition: all 0.2s; }
+.article-card:hover { border-color: #3e3e3e; background: var(--surface2); }
+.article-card.is-saved { border-color: rgba(240,160,96,0.3); }
+.article-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.article-source { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--accent2); background: rgba(96,200,240,0.08); padding: 2px 7px; border-radius: 4px; }
+.article-date { font-size: 10px; color: var(--dim); font-family: 'DM Mono', monospace; }
+.article-title { font-size: 13px; font-weight: 500; line-height: 1.5; margin-bottom: 6px; }
+.article-title a { color: inherit; text-decoration: none; }
+.article-title a:hover { color: var(--accent); }
+.article-desc { font-size: 12px; color: var(--muted); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.article-actions { display: flex; gap: 6px; margin-top: 10px; }
+.btn-save { border: 1px solid var(--border); background: transparent; color: var(--muted); border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: pointer; font-family: 'Noto Sans JP', sans-serif; transition: all 0.15s; }
+.btn-save:hover { border-color: var(--saved); color: var(--saved); }
+.btn-save.saved { background: rgba(240,160,96,0.1); border-color: var(--saved); color: var(--saved); }
+.btn-open { border: 1px solid var(--border); background: transparent; color: var(--muted); border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: pointer; text-decoration: none; font-family: 'Noto Sans JP', sans-serif; transition: all 0.15s; display: inline-flex; align-items: center; }
+.btn-open:hover { border-color: var(--accent2); color: var(--accent2); }
+
+.saved-item { background: var(--surface); border: 1px solid rgba(240,160,96,0.2); border-radius: 8px; padding: 10px; transition: all 0.15s; }
+.saved-item:hover { border-color: rgba(240,160,96,0.4); }
+.saved-item-source { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--accent2); margin-bottom: 4px; }
+.saved-item-title { font-size: 12px; font-weight: 500; line-height: 1.4; margin-bottom: 6px; }
+.saved-item-actions { display: flex; gap: 6px; }
+
+.memo-area { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; color: var(--text); font-size: 12px; font-family: 'Noto Sans JP', sans-serif; resize: none; outline: none; line-height: 1.6; transition: border-color 0.2s; }
+.memo-area:focus { border-color: var(--accent); }
+.memo-area::placeholder { color: var(--dim); }
+.download-btn { width: 100%; background: var(--accent); color: #0f0f0f; border: none; border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Noto Sans JP', sans-serif; transition: all 0.15s; }
+.download-btn:hover { background: #d8ff70; }
+.download-btn:disabled { background: var(--border); color: var(--dim); cursor: default; }
+
+.filter-tabs { display: flex; gap: 4px; }
+.filter-tab { padding: 4px 10px; border-radius: 20px; font-size: 11px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); transition: all 0.15s; font-family: 'Noto Sans JP', sans-serif; }
+.filter-tab.active { background: var(--accent); color: #0f0f0f; border-color: var(--accent); font-weight: 700; }
+
+.toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 16px; font-size: 12px; color: var(--text); z-index: 1000; animation: toastIn 0.3s ease; white-space: nowrap; }
+.toast.success { border-color: var(--accent); }
+.toast.error { border-color: var(--danger); }
+@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ===== DESKTOP ===== */
+.desktop-layout { display: grid; grid-template-columns: 260px 1fr 300px; height: calc(100vh - 52px); }
+.sidebar { border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+.sidebar-section { padding: 14px; border-bottom: 1px solid var(--border); }
+.sidebar-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--dim); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 8px; }
+.feed-add { display: flex; gap: 6px; }
+.feed-add input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text); font-size: 12px; font-family: 'DM Mono', monospace; outline: none; transition: border-color 0.2s; }
+.feed-add input:focus { border-color: var(--accent); }
+.feed-add input::placeholder { color: var(--dim); }
+.feed-tag-select { width: 100%; margin-top: 6px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; color: var(--text); font-size: 12px; font-family: 'Noto Sans JP', sans-serif; outline: none; }
+.feed-list { flex: 1; overflow-y: auto; padding: 8px; }
+.feed-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 6px; cursor: pointer; transition: background 0.15s; gap: 8px; }
+.feed-item:hover { background: var(--surface); }
+.feed-item.active { background: var(--surface2); border-left: 2px solid var(--accent); }
+.feed-item-info { flex: 1; min-width: 0; }
+.feed-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feed-count { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent); background: rgba(200,240,96,0.1); padding: 2px 6px; border-radius: 10px; flex-shrink: 0; }
+.d-main { display: flex; flex-direction: column; overflow: hidden; }
+.main-toolbar { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.main-title { font-size: 12px; color: var(--muted); }
+.main-title strong { color: var(--text); }
+.articles { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+.saved-panel { border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+.saved-header { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.saved-title { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); }
+.saved-count { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--saved); }
+.saved-list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.saved-footer { padding: 10px 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+
+/* ===== MOBILE ===== */
+.mobile-layout { display: none; flex-direction: column; height: calc(100vh - 52px); }
+.mobile-panel { display: none; flex-direction: column; flex: 1; overflow: hidden; padding-bottom: 56px; }
+.mobile-panel.active { display: flex; }
+.mobile-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 56px; background: var(--bg); border-top: 1px solid var(--border); display: flex; z-index: 200; }
+.mobile-nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; border: none; background: transparent; color: var(--muted); font-size: 10px; font-family: 'Noto Sans JP', sans-serif; transition: color 0.15s; padding: 8px; position: relative; }
+.mobile-nav-btn .nav-icon { font-size: 18px; line-height: 1; }
+.mobile-nav-btn.active { color: var(--accent); }
+.mobile-nav-badge { position: absolute; top: 6px; right: calc(50% - 20px); background: var(--saved); color: #0f0f0f; font-size: 9px; font-weight: 700; font-family: 'DM Mono', monospace; border-radius: 10px; padding: 1px 5px; min-width: 16px; text-align: center; }
+.mobile-feed-section { padding: 12px; border-bottom: 1px solid var(--border); }
+.mobile-input-row { display: flex; gap: 6px; margin-bottom: 6px; }
+.mobile-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 13px; font-family: 'DM Mono', monospace; outline: none; }
+.mobile-input:focus { border-color: var(--accent); }
+.mobile-input::placeholder { color: var(--dim); }
+.mobile-select { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 13px; font-family: 'Noto Sans JP', sans-serif; outline: none; }
+.mobile-feed-list { flex: 1; overflow-y: auto; padding: 8px 12px; }
+.mobile-feed-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s; gap: 10px; border: 1px solid transparent; margin-bottom: 6px; }
+.mobile-feed-item:hover { background: var(--surface); }
+.mobile-feed-item.active { background: var(--surface2); border-color: var(--accent); }
+.mobile-feed-name { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+.mobile-articles-header { padding: 10px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+.mobile-articles-title { font-size: 12px; color: var(--muted); }
+.mobile-articles-title strong { color: var(--text); }
+.mobile-articles { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+.mobile-saved-header { padding: 10px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.mobile-saved-list { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.mobile-saved-footer { padding: 10px 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+
+@media (max-width: 768px) {
+  .desktop-layout { display: none; }
+  .mobile-layout { display: flex; }
+}
+@media (min-width: 769px) {
+  .desktop-layout { display: grid; }
+  .mobile-layout { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">RSS<span>/</span>CLIP</div>
+  <div class="header-right">
+    <span class="updated" id="last-updated"></span>
+    <button class="btn btn-ghost" onclick="refreshAll()" style="padding:5px 10px;font-size:11px;">↻ 更新</button>
+  </div>
+</header>
+
+<!-- DESKTOP -->
+<div class="desktop-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">フィード登録</div>
+      <div class="feed-add">
+        <input type="text" id="d-feed-url" placeholder="RSS URL を貼り付け" />
+        <button class="btn btn-accent" onclick="addFeed('d')">追加</button>
+      </div>
+      <select class="feed-tag-select" id="d-feed-tag">
+        <option value="総務">総務</option>
+        <option value="経理">経理</option>
+        <option value="人事">人事</option>
+        <option value="その他">その他</option>
+      </select>
+    </div>
+    <div style="padding:8px 14px 4px;display:flex;align-items:center;justify-content:space-between;">
+      <div class="sidebar-label" style="margin:0">登録フィード</div>
+      <button class="btn btn-ghost" style="padding:2px 8px;font-size:10px;" onclick="loadAll()">全て</button>
+    </div>
+    <div class="feed-list" id="d-feed-list"></div>
+  </aside>
+  <main class="d-main">
+    <div class="main-toolbar">
+      <div class="main-title" id="d-main-title">フィードを選択してください</div>
+      <div class="filter-tabs">
+        <button class="filter-tab active" onclick="setFilter('all',this)">すべて</button>
+        <button class="filter-tab" onclick="setFilter('saved',this)">保存済み</button>
+      </div>
+    </div>
+    <div class="articles" id="d-articles">
+      <div class="state-msg"><div class="icon">📡</div><p>左のサイドバーからフィードを追加してください</p></div>
+    </div>
+  </main>
+  <aside class="saved-panel">
+    <div class="saved-header">
+      <div class="saved-title">CLIPPED</div>
+      <div class="saved-count" id="d-saved-count">0 件</div>
+    </div>
+    <div class="saved-list" id="d-saved-list"></div>
+    <div class="saved-footer">
+      <textarea class="memo-area" id="d-memo" rows="3" placeholder="メモ（.mdに含まれます）"></textarea>
+      <button class="download-btn" id="d-dl-btn" onclick="downloadMd()" disabled>↓ Obsidian用 .md をダウンロード</button>
+    </div>
+  </aside>
+</div>
+
+<!-- MOBILE -->
+<div class="mobile-layout">
+  <!-- フィードパネル -->
+  <div class="mobile-panel active" id="m-panel-feeds">
+    <div class="mobile-feed-section">
+      <div class="mobile-input-row">
+        <input type="text" class="mobile-input" id="m-feed-url" placeholder="RSS URL を貼り付け" />
+        <button class="btn btn-accent" onclick="addFeed('m')">追加</button>
+      </div>
+      <select class="mobile-select" id="m-feed-tag">
+        <option value="総務">総務</option>
+        <option value="経理">経理</option>
+        <option value="人事">人事</option>
+        <option value="その他">その他</option>
+      </select>
+    </div>
+    <div style="padding:8px 12px 4px;display:flex;align-items:center;justify-content:space-between;">
+      <div class="sidebar-label" style="margin:0">登録フィード</div>
+      <button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;" onclick="loadAll();switchPanel('articles')">全て表示</button>
+    </div>
+    <div class="mobile-feed-list" id="m-feed-list"></div>
+  </div>
+
+  <!-- 記事パネル -->
+  <div class="mobile-panel" id="m-panel-articles">
+    <div class="mobile-articles-header">
+      <div class="mobile-articles-title" id="m-main-title">フィードを選択してください</div>
+      <div class="filter-tabs">
+        <button class="filter-tab active" onclick="setFilter('all',this)">すべて</button>
+        <button class="filter-tab" onclick="setFilter('saved',this)">保存済み</button>
+      </div>
+    </div>
+    <div class="mobile-articles" id="m-articles">
+      <div class="state-msg"><div class="icon">📡</div><p>フィードタブからフィードを選択してください</p></div>
+    </div>
+  </div>
+
+  <!-- 保存済みパネル -->
+  <div class="mobile-panel" id="m-panel-saved">
+    <div class="mobile-saved-header">
+      <div class="saved-title">CLIPPED</div>
+      <div class="saved-count" id="m-saved-count">0 件</div>
+    </div>
+    <div class="mobile-saved-list" id="m-saved-list"></div>
+    <div class="mobile-saved-footer">
+      <textarea class="memo-area" id="m-memo" rows="3" placeholder="メモ（.mdに含まれます）"></textarea>
+      <button class="download-btn" id="m-dl-btn" onclick="downloadMd()" disabled>↓ Obsidian用 .md をダウンロード</button>
+    </div>
+  </div>
+
+  <!-- ボトムナビ -->
+  <nav class="mobile-nav">
+    <button class="mobile-nav-btn active" id="m-nav-feeds" onclick="switchPanel('feeds')">
+      <span class="nav-icon">📡</span>フィード
+    </button>
+    <button class="mobile-nav-btn" id="m-nav-articles" onclick="switchPanel('articles')">
+      <span class="nav-icon">📰</span>記事
+    </button>
+    <button class="mobile-nav-btn" id="m-nav-saved" onclick="switchPanel('saved')" style="position:relative;">
+      <span class="nav-icon">🔖</span>保存済み
+      <span class="mobile-nav-badge" id="m-badge" style="display:none">0</span>
+    </button>
+  </nav>
+</div>
+
+<script>
+let feeds = JSON.parse(localStorage.getItem('rss-feeds') || '[]');
+let savedArticles = JSON.parse(localStorage.getItem('rss-saved') || '[]');
+let allArticles = [];
+let currentFeedId = null;
+let currentFilter = 'all';
+
+const PROXY = 'https://api.rss2json.com/v1/api.json?rss_url=';
+
+if (feeds.length === 0) {
+  feeds = [
+    { id: uid(), name: '厚生労働省 新着情報', url: 'https://www.mhlw.go.jp/rss/new.rdf', tag: '人事' },
+    { id: uid(), name: 'freee 公式ブログ', url: 'https://corp.freee.co.jp/feed', tag: '経理' },
+    { id: uid(), name: 'マネーフォワード', url: 'https://moneyforward.com/media/feed', tag: '経理' },
+  ];
+  saveFeeds();
+}
+
+function uid() { return Math.random().toString(36).slice(2,9); }
+function saveFeeds() { localStorage.setItem('rss-feeds', JSON.stringify(feeds)); }
+function saveSaved() { localStorage.setItem('rss-saved', JSON.stringify(savedArticles)); }
+
+function switchPanel(panel) {
+  ['feeds','articles','saved'].forEach(p => {
+    document.getElementById(`m-panel-${p}`).classList.toggle('active', p === panel);
+    document.getElementById(`m-nav-${p}`).classList.toggle('active', p === panel);
+  });
+}
+
+async function addFeed(prefix) {
+  const urlEl = document.getElementById(`${prefix}-feed-url`);
+  const tagEl = document.getElementById(`${prefix}-feed-tag`);
+  const url = urlEl.value.trim();
+  if (!url) return;
+  showToast('取得中...', 'info');
+  try {
+    const res = await fetch(PROXY + encodeURIComponent(url));
+    const data = await res.json();
+    if (data.status !== 'ok') throw new Error();
+    feeds.push({ id: uid(), name: data.feed.title || url, url, tag: tagEl.value });
+    saveFeeds(); renderAll(); urlEl.value = '';
+    showToast('✓ 追加しました', 'success');
+    if (prefix === 'm') switchPanel('articles');
+    loadFeed(feeds[feeds.length-1].id);
+  } catch(e) { showToast('取得できませんでした', 'error'); }
+}
+
+function removeFeed(id) {
+  feeds = feeds.filter(f => f.id !== id);
+  saveFeeds(); renderAll();
+  if (currentFeedId === id) { currentFeedId = null; allArticles = []; renderArticles(); }
+}
+
+function renderAll() { renderFeedList('d'); renderFeedList('m'); renderSaved(); }
+
+function renderFeedList(p) {
+  const el = document.getElementById(`${p}-feed-list`);
+  if (!feeds.length) { el.innerHTML = '<div class="state-msg" style="padding:20px"><p style="font-size:11px;">URLを追加してください</p></div>'; return; }
+  const isMobile = p === 'm';
+  el.innerHTML = feeds.map(f => {
+    const cnt = savedArticles.filter(a => a.feedId === f.id).length;
+    return isMobile ? `
+      <div class="mobile-feed-item ${currentFeedId===f.id?'active':''}" onclick="loadFeed('${f.id}');switchPanel('articles')">
+        <div style="flex:1;min-width:0">
+          <div class="mobile-feed-name">${escHtml(f.name)}</div>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:3px"><span class="tag-badge tag-${f.tag}">${f.tag}</span></div>
+        </div>
+        ${cnt>0?`<div class="feed-count">${cnt}</div>`:''}
+        <button class="btn btn-danger" onclick="event.stopPropagation();removeFeed('${f.id}')">✕</button>
+      </div>` : `
+      <div class="feed-item ${currentFeedId===f.id?'active':''}" onclick="loadFeed('${f.id}')">
+        <div class="feed-item-info">
+          <div class="feed-name">${escHtml(f.name)}</div>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:3px"><span class="tag-badge tag-${f.tag}">${f.tag}</span></div>
+        </div>
+        ${cnt>0?`<div class="feed-count">${cnt}</div>`:''}
+        <button class="btn btn-danger" onclick="event.stopPropagation();removeFeed('${f.id}')">✕</button>
+      </div>`;
+  }).join('');
+}
+
+async function loadFeed(feedId) {
+  currentFeedId = feedId;
+  const feed = feeds.find(f => f.id === feedId);
+  if (!feed) return;
+  renderFeedList('d'); renderFeedList('m');
+  const title = `<strong>${escHtml(feed.name)}</strong>`;
+  document.getElementById('d-main-title').innerHTML = title;
+  document.getElementById('m-main-title').innerHTML = title;
+  const loading = '<div class="state-msg"><div class="spinner"></div><p>取得中...</p></div>';
+  document.getElementById('d-articles').innerHTML = loading;
+  document.getElementById('m-articles').innerHTML = loading;
+  try {
+    const res = await fetch(PROXY + encodeURIComponent(feed.url) + '&count=30');
+    const data = await res.json();
+    if (data.status !== 'ok') throw new Error();
+    allArticles = data.items.map(i => ({
+      id: uid(), feedId: feed.id, feedName: feed.name, feedTag: feed.tag,
+      title: i.title, link: i.link,
+      description: stripHtml(i.description || i.content || ''),
+      pubDate: i.pubDate,
+    }));
+    document.getElementById('last-updated').textContent = '更新: ' + new Date().toLocaleTimeString('ja-JP');
+    renderArticles();
+  } catch(e) {
+    const err = '<div class="state-msg"><div class="icon">⚠️</div><p>取得できませんでした</p></div>';
+    document.getElementById('d-articles').innerHTML = err;
+    document.getElementById('m-articles').innerHTML = err;
+  }
+}
+
+async function loadAll() {
+  currentFeedId = 'all';
+  renderFeedList('d'); renderFeedList('m');
+  allArticles = [];
+  const loading = '<div class="state-msg"><div class="spinner"></div><p>全フィードを取得中...</p></div>';
+  document.getElementById('d-articles').innerHTML = loading;
+  document.getElementById('m-articles').innerHTML = loading;
+  document.getElementById('d-main-title').innerHTML = '<strong>すべてのフィード</strong>';
+  document.getElementById('m-main-title').innerHTML = '<strong>すべてのフィード</strong>';
+  for (const feed of feeds) {
+    try {
+      const res = await fetch(PROXY + encodeURIComponent(feed.url) + '&count=10');
+      const data = await res.json();
+      if (data.status !== 'ok') continue;
+      allArticles = allArticles.concat(data.items.map(i => ({
+        id: uid(), feedId: feed.id, feedName: feed.name, feedTag: feed.tag,
+        title: i.title, link: i.link,
+        description: stripHtml(i.description || i.content || ''),
+        pubDate: i.pubDate,
+      })));
+    } catch(e) {}
+  }
+  allArticles.sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate));
+  document.getElementById('last-updated').textContent = '更新: ' + new Date().toLocaleTimeString('ja-JP');
+  renderArticles();
+}
+
+function refreshAll() { if (currentFeedId === 'all') loadAll(); else if (currentFeedId) loadFeed(currentFeedId); }
+
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.toggle('active', t.textContent === btn.textContent));
+  renderArticles();
+}
+
+function renderArticles() {
+  let arts = allArticles;
+  if (currentFilter === 'saved') {
+    const links = savedArticles.map(a => a.link);
+    arts = arts.filter(a => links.includes(a.link));
+  }
+  const html = !arts.length
+    ? '<div class="state-msg"><div class="icon">📭</div><p>記事がありません</p></div>'
+    : arts.map(a => {
+        const isSaved = savedArticles.some(s => s.link === a.link);
+        const date = a.pubDate ? new Date(a.pubDate).toLocaleDateString('ja-JP') : '';
+        const j = JSON.stringify(a).replace(/"/g,'&quot;');
+        return `<div class="article-card ${isSaved?'is-saved':''}">
+          <div class="article-meta">
+            <span class="article-source">${escHtml(a.feedName)}</span>
+            <span class="tag-badge tag-${a.feedTag}">${a.feedTag}</span>
+            ${date?`<span class="article-date">${date}</span>`:''}
+          </div>
+          <div class="article-title"><a href="${escHtml(a.link)}" target="_blank" rel="noopener">${escHtml(a.title)}</a></div>
+          ${a.description?`<div class="article-desc">${escHtml(a.description)}</div>`:''}
+          <div class="article-actions">
+            <button class="btn-save ${isSaved?'saved':''}" onclick="toggleSave(${j})">${isSaved?'✓ 保存済み':'＋ 保存'}</button>
+            <a class="btn-open" href="${escHtml(a.link)}" target="_blank" rel="noopener">開く →</a>
+          </div>
+        </div>`;
+      }).join('');
+  document.getElementById('d-articles').innerHTML = html;
+  document.getElementById('m-articles').innerHTML = html;
+}
+
+function toggleSave(article) {
+  const idx = savedArticles.findIndex(a => a.link === article.link);
+  if (idx >= 0) { savedArticles.splice(idx,1); showToast('保存を解除しました','info'); }
+  else { savedArticles.push({...article, savedAt: new Date().toISOString()}); showToast('✓ 保存しました','success'); }
+  saveSaved(); renderArticles(); renderSaved(); renderFeedList('d'); renderFeedList('m');
+}
+
+function removeSaved(link) {
+  savedArticles = savedArticles.filter(a => a.link !== link);
+  saveSaved(); renderArticles(); renderSaved(); renderFeedList('d'); renderFeedList('m');
+}
+
+function renderSaved() {
+  const cnt = savedArticles.length;
+  ['d','m'].forEach(p => {
+    document.getElementById(`${p}-saved-count`).textContent = cnt + ' 件';
+    document.getElementById(`${p}-dl-btn`).disabled = cnt === 0;
+  });
+  const badge = document.getElementById('m-badge');
+  badge.style.display = cnt > 0 ? 'block' : 'none';
+  badge.textContent = cnt;
+  const empty = '<div class="state-msg" style="padding:20px"><p style="font-size:11px;">保存した記事がここに表示されます</p></div>';
+  if (!cnt) { document.getElementById('d-saved-list').innerHTML = empty; document.getElementById('m-saved-list').innerHTML = empty; return; }
+  const html = savedArticles.map(a => `
+    <div class="saved-item">
+      <div class="saved-item-source"><span class="tag-badge tag-${a.feedTag}">${a.feedTag}</span> ${escHtml(a.feedName)}</div>
+      <div class="saved-item-title">${escHtml(a.title)}</div>
+      <div class="saved-item-actions">
+        <a class="btn-open" href="${escHtml(a.link)}" target="_blank" rel="noopener" style="font-size:10px;padding:3px 8px;">開く</a>
+        <button class="btn btn-danger" onclick="removeSaved('${escHtml(a.link)}')">削除</button>
+      </div>
+    </div>`).join('');
+  document.getElementById('d-saved-list').innerHTML = html;
+  document.getElementById('m-saved-list').innerHTML = html;
+}
+
+function downloadMd() {
+  const memo = document.getElementById('d-memo').value || document.getElementById('m-memo').value;
+  const today = new Date().toISOString().split('T')[0];
+  let md = `# RSS クリップ — ${today}\n\n作成日: ${today}\n\n`;
+  if (memo) md += `## メモ・コメント\n\n${memo}\n\n`;
+  [...new Set(savedArticles.map(a => a.feedTag))].forEach(tag => {
+    md += `## ${tag}\n\n`;
+    savedArticles.filter(a => a.feedTag === tag).forEach(a => {
+      const date = a.pubDate ? new Date(a.pubDate).toLocaleDateString('ja-JP') : '';
+      md += `### ${a.title}\n\n- **ソース**: ${a.feedName}\n`;
+      if (date) md += `- **日付**: ${date}\n`;
+      md += `- **URL**: ${a.link}\n`;
+      if (a.description) md += `\n${a.description.slice(0,300)}${a.description.length>300?'...':''}\n`;
+      md += `\n---\n\n`;
+    });
+  });
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const el = document.createElement('a');
+  el.href = url; el.download = `rss-clip-${today}.md`; el.click();
+  URL.revokeObjectURL(url);
+  showToast('✓ .md をダウンロードしました', 'success');
+}
+
+function escHtml(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+function stripHtml(h) { const d = document.createElement('div'); d.innerHTML = h; return d.textContent || ''; }
+
+let toastTimer;
+function showToast(msg, type='info') {
+  const ex = document.querySelector('.toast'); if (ex) ex.remove();
+  clearTimeout(toastTimer);
+  const t = document.createElement('div');
+  t.className = `toast ${type}`; t.textContent = msg;
+  document.body.appendChild(t);
+  toastTimer = setTimeout(() => t.remove(), 2500);
+}
+
+renderAll();
+</script>
+</body>
+</html>
